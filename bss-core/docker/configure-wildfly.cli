@@ -1,0 +1,15 @@
+# Run while the image is built, against an embedded server (full profile). No password is stored here:
+# the data source reads its settings from environment variables when the container starts.
+embed-server --server-config=standalone-full.xml --std-out=echo
+
+module add --name=org.postgresql --resources=/tmp/postgresql.jar --dependencies=jakarta.transaction.api
+/subsystem=datasources/jdbc-driver=postgresql:add(driver-name=postgresql, driver-module-name=org.postgresql, driver-class-name=org.postgresql.Driver)
+
+data-source add --name=BssCoreDS --jndi-name=java:jboss/datasources/BssCoreDS --driver-name=postgresql \
+    --connection-url=${env.BSS_DB_URL:jdbc:postgresql://localhost:5432/bss_core} \
+    --user-name=${env.BSS_DB_USER:bss_app} --password=${env.BSS_DB_PASSWORD:} \
+    --min-pool-size=0 --max-pool-size=20 --blocking-timeout-wait-millis=3000
+
+jms-queue add --queue-address=SmsQueue --entries=[java:/jms/queue/SmsQueue]
+
+stop-embedded-server

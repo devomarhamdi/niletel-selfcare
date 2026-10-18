@@ -1,0 +1,17 @@
+# Build output
+target/
+*.class
+*.war
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Secrets and local settings: never commit a password
+.env
+*.local
+application-local.properties
