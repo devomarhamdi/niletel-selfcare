@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -58,7 +59,7 @@ public class LedgerDao {
             throws SQLException {
 
         String query = """
-            SELECT txn_id, msisdn, txn_type, amount_piasters,
+            SELECT txn_id, msisdn, txn_ts, txn_type, amount_piasters,
                     balance_after, ref_no, reason
             FROM ledger
             WHERE txn_id = ?
@@ -83,6 +84,7 @@ public class LedgerDao {
         return new LedgerRecord(
                 rs.getLong("txn_id"),
                 rs.getString("msisdn"),
+                rs.getObject("txn_ts", LocalDateTime.class),
                 rs.getString("txn_type"),
                 rs.getInt("amount_piasters"),
                 rs.getInt("balance_after"),
