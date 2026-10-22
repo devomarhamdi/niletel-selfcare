@@ -7,6 +7,9 @@ import java.util.HexFormat;
 
 public final class PasswordHasher {
 
+    private PasswordHasher() {
+    }
+
     public static String sha256Hex(String password) {
         if (password == null) {
             throw new IllegalArgumentException("Password must not be null");

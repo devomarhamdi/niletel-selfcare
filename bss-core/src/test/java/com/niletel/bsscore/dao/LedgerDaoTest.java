@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,16 +41,16 @@ class LedgerDaoTest {
         when(resultSet.getLong("txn_id")).thenReturn(50231L);
 
         assertEquals(50231L, dao.insert(
-                "01012345678", "R", 5000, 5000, "REF-1", "VOUCHER RECHARGE"
+                "01012345678", "D", 500, 4500, "REF-001", "CALL CHARGE"
         ));
 
         verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains("RETURNING txn_id"));
         verify(statement).setString(1, "01012345678");
-        verify(statement).setString(2, "R");
-        verify(statement).setInt(3, 5000);
-        verify(statement).setInt(4, 5000);
-        verify(statement).setString(5, "REF-1");
-        verify(statement).setString(6, "VOUCHER RECHARGE");
+        verify(statement).setString(2, "D");
+        verify(statement).setInt(3, 500);
+        verify(statement).setInt(4, 4500);
+        verify(statement).setString(5, "REF-001");
+        verify(statement).setString(6, "CALL CHARGE");
         verify(resultSet).close();
         verify(statement).close();
         verify(connection).close();
@@ -60,7 +61,7 @@ class LedgerDaoTest {
         when(resultSet.next()).thenReturn(false);
 
         assertThrows(SQLException.class, () -> dao.insert(
-                "01012345678", "R", 5000, 5000, "REF-1", "VOUCHER RECHARGE"
+                "01012345678", "D", 500, 4500, "REF-001", "CALL CHARGE"
         ));
 
         verify(resultSet).close();
@@ -73,14 +74,17 @@ class LedgerDaoTest {
         when(resultSet.next()).thenReturn(true);
         when(resultSet.getLong("txn_id")).thenReturn(50231L);
         when(resultSet.getString("msisdn")).thenReturn("01012345678");
+        when(resultSet.getObject("txn_ts", LocalDateTime.class))
+                .thenReturn(LocalDateTime.of(2025, 3, 1, 10, 15, 30));
         when(resultSet.getString("txn_type")).thenReturn("R");
         when(resultSet.getInt("amount_piasters")).thenReturn(5000);
         when(resultSet.getInt("balance_after")).thenReturn(5000);
-        when(resultSet.getString("ref_no")).thenReturn("REF-1");
+        when(resultSet.getString("ref_no")).thenReturn("");
         when(resultSet.getString("reason")).thenReturn("VOUCHER RECHARGE");
 
         assertEquals(Optional.of(new LedgerRecord(
-                50231L, "01012345678", "R", 5000, 5000, "REF-1", "VOUCHER RECHARGE"
+                50231L, "01012345678", LocalDateTime.of(2025, 3, 1, 10, 15, 30),
+                "R", 5000, 5000, "", "VOUCHER RECHARGE"
         )), dao.findById(50231L));
 
         verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains("WHERE txn_id = ?"));
