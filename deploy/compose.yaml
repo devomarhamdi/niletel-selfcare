@@ -10,6 +10,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy deploy/.env.example to deploy/.env}
       BSS_DB_PASSWORD: ${BSS_DB_PASSWORD:?copy deploy/.env.example to deploy/.env}
       SELFCARE_DB_PASSWORD: ${SELFCARE_DB_PASSWORD:?copy deploy/.env.example to deploy/.env}
+      TZ: Africa/Cairo
+      PGTZ: Africa/Cairo
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
@@ -28,6 +30,7 @@ services:
       BSS_DB_URL: jdbc:postgresql://postgres:5432/bss_core
       BSS_DB_USER: bss_app
       BSS_DB_PASSWORD: ${BSS_DB_PASSWORD:?copy deploy/.env.example to deploy/.env}
+      TZ: Africa/Cairo
     expose:
       - "8080"
     depends_on:
@@ -41,6 +44,7 @@ services:
       SELFCARE_DB_URL: jdbc:postgresql://postgres:5432/selfcare
       SELFCARE_DB_USER: selfcare_app
       SELFCARE_DB_PASSWORD: ${SELFCARE_DB_PASSWORD:?copy deploy/.env.example to deploy/.env}
+      TZ: Africa/Cairo
     ports:
       - "8081:8081"
     depends_on:
