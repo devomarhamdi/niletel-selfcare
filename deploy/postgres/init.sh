@@ -10,7 +10,7 @@ psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres \
 
 # 2. Tables and seed data, each as the user of that service
 run_as() { # user database file
-  [ -s "$3" ] && PGPASSWORD="$4" psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U "$1" -d "$2" -f "$3" || true
+    if [ -s "$3" ]; then psql -v ON_ERROR_STOP=1 -U "$1" -d "$2" -f "$3"; fi
 }
 run_as bss_app      bss_core /db/bss-core/01-ddl.sql   "$BSS_DB_PASSWORD"
 run_as bss_app      bss_core /db/bss-core/02-seed.sql  "$BSS_DB_PASSWORD"

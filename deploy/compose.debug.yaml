@@ -1,0 +1,13 @@
+# Only on your own machine:
+#   docker compose -f deploy/compose.yaml -f deploy/compose.debug.yaml up --build
+services:
+  bss-core:
+    ports:
+      - "127.0.0.1:8080:8080"   # back-office and .http tests
+      - "127.0.0.1:8787:8787"   # debugger
+  selfcare-api:
+    environment:
+      JAVA_TOOL_OPTIONS: >-
+        -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    ports:
+      - "127.0.0.1:5005:5005"   # debugger
