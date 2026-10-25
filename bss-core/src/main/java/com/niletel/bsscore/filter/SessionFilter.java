@@ -1,6 +1,8 @@
 package com.niletel.bsscore.filter;
 
+import com.niletel.bsscore.common.ErrorCode;
 import com.niletel.bsscore.common.LegacyErrorWriter;
+import com.niletel.bsscore.common.SessionKeys;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,13 +29,11 @@ public class SessionFilter implements Filter {
 
         String role = roleOf(request.getSession(false));
         if (role == null){
-            LegacyErrorWriter.writeFail(response, HttpServletResponse.SC_UNAUTHORIZED,
-                    "SES001", "No active session");
+            LegacyErrorWriter.writeFail(response, ErrorCode.SES001);
             return;
         }
         if(!AccessRules.isAllowed(path, role)){
-            LegacyErrorWriter.writeFail(response, HttpServletResponse.SC_OK,
-                    "SEC001", "Role not allowed, Access Denied");
+            LegacyErrorWriter.writeFail(response, ErrorCode.SEC001);
             return;
         }
         chain.doFilter(request, response);
@@ -46,7 +46,7 @@ public class SessionFilter implements Filter {
     }
 
     private String roleOf(HttpSession session) {
-        return session == null ? null : (String) session.getAttribute("SessionKeys.role");
+        return session == null ? null : (String) session.getAttribute(SessionKeys.ROLE);
     }
 
 }

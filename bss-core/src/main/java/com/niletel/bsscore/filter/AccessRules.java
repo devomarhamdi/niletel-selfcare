@@ -22,7 +22,7 @@ public final class AccessRules {
     public static final List<AccessRule> RULES = List.of(
             new AccessRule("/auth/logout", ANY_ROLE),
             new AccessRule("/tariffs", ANY_ROLE),
-            new AccessRule("ME_PATHS", Set.of(SUB)),
+            new AccessRule(ME_PATHS, Set.of(SUB)),
             new AccessRule("/subscribers/[^/]+", Set.of(OPR,SYS))
     );
 
