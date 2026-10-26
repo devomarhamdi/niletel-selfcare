@@ -10,6 +10,11 @@ public final class JsonKeys {
     public static final String MSISDN = "MSISDN";
     public static final String FULL_NAME = "FULL_NAME";
     public static final String ROLE_CODE = "ROLE_CODE";
+    public static final String STATUS = "STATUS";
+    public static final String TARIFF_CODE = "TARIFF_CODE";
+    public static final String TARIFF_NAME = "TARIFF_NAME";
+    public static final String BALANCE_PIASTERS = "BALANCE_PIASTERS";
+    public static final String ACTIVATION_DT = "ACTIVATION_DT";
 
     public static final String RESULT_OK = "OK";
     public static final String RESULT_FAIL = "FAIL";

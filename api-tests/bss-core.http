@@ -15,6 +15,10 @@ Content-Type: application/x-www-form-urlencoded
 
 msisdn=01012345678&pin=1234
 
+### Mona profile and current balance
+# Expected: {"RESULT":"OK","DATA":{"MSISDN":"01012345678","FULL_NAME":"Mona Adel","STATUS":"A","TARIFF_CODE":"PRE01","TARIFF_NAME":"Nile Prepaid","BALANCE_PIASTERS":6750,"ACTIVATION_DT":"01/03/2025"}}
+GET {{baseUrl}}/subscriber/me
+
 ### SUB is denied operator subscriber lookup -> HTTP 200 SEC001
 GET {{baseUrl}}/subscribers/01012345678
 
@@ -77,3 +81,7 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/x-www-form-urlencoded
 
 msisdn=01512345678&pin=2222
+
+### Youssef profile: OLD99 tariff, zero balance, 12/08/2016 activation
+# Expected: {"RESULT":"OK","DATA":{"MSISDN":"01512345678","FULL_NAME":"Youssef Fathy","STATUS":"A","TARIFF_CODE":"OLD99","TARIFF_NAME":"Classic 2015","BALANCE_PIASTERS":0,"ACTIVATION_DT":"12/08/2016"}}
+GET {{baseUrl}}/subscriber/me
