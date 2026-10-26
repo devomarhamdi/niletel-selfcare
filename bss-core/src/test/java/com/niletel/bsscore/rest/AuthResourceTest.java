@@ -42,8 +42,8 @@ class AuthResourceTest {
                 "{\"RESULT\":\"OK\",\"DATA\":{\"MSISDN\":\"01012345678\",\"FULL_NAME\":\"Mona Adel\",\"ROLE_CODE\":\"SUB\"}}",
                 response.getEntity()
         );
-        verify(session).setAttribute("identity", "01012345678");
-        verify(session).setAttribute("role", "SUB");
+        verify(session).setAttribute("bss.user", "01012345678");
+        verify(session).setAttribute("bss.role", "SUB");
     }
 
     @Test
