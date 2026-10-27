@@ -1,0 +1,79 @@
+@baseUrl = http://localhost:8080/bss-core/api
+
+### GET without a cookie -> HTTP 401 SES001
+GET {{baseUrl}}/subscriber/me
+
+### GET with an invalid cookie -> HTTP 401 SES001
+GET {{baseUrl}}/subscriber/me
+Cookie: JSESSIONID=not-a-valid-session
+
+### Mona: successful subscriber login
+# Expected DATA: {"MSISDN":"01012345678","FULL_NAME":"Mona Adel","ROLE_CODE":"SUB"}
+# Expected cookie: Set-Cookie: JSESSIONID=...; path=/bss-core; HttpOnly
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01012345678&pin=1234
+
+### SUB is denied operator subscriber lookup -> HTTP 200 SEC001
+GET {{baseUrl}}/subscribers/01012345678
+
+### Re-login rotates the existing JSESSIONID
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01012345678&pin=1234
+
+### Missing PIN -> VAL001
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01012345678
+
+### Invalid MSISDN -> VAL001
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=123&pin=1234
+
+### Invalid PIN format -> VAL001
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01012345678&pin=12a4
+
+### Unknown MSISDN -> AUTH001
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01099999999&pin=1234
+
+### Wrong PIN -> AUTH001 (same response as unknown MSISDN)
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01012345678&pin=0000
+
+### Suspended Salma with correct PIN -> AUTH002
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01234567890&pin=1111
+
+### Suspended Salma with wrong PIN -> AUTH001
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01234567890&pin=0000
+
+### Karim: successful subscriber login
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01123456789&pin=4321
+
+### Youssef: successful subscriber login
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01512345678&pin=2222
