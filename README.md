@@ -218,3 +218,8 @@ Done so far: the project skeleton, Docker setup, the health endpoints and the fo
 | CORS error in the browser | Open the site as `http://localhost:5500`, not `127.0.0.1`. |
 | Port 8080, 8081, 5500 or 5432 already in use | Stop the other program using the port. |
 | Text with wrong line endings on Windows | `.gitattributes` forces LF for shell scripts, SQL and Dockerfiles; do not override it. |
+
+## Design Decisions
+
+### L-08 / L-22: Tariff Plan Cache
+The `TariffCache` is a `@Singleton @Startup` EJB. It loads all tariff plans into memory once when WildFly starts. If the database is unavailable at startup, the `@PostConstruct` method fails, which causes the deployment to fail (the application crashes). We accept this behavior because `deploy/compose.yaml` uses `depends_on: postgres: condition: service_healthy`, ensuring the database is fully ready before `bss-core` starts.
