@@ -10,19 +10,17 @@ public enum ErrorCode {
 
     AUTH001("AUTH001", 200, "Invalid credentials"),
     AUTH002("AUTH002", 200, "Account locked"),
-    AUTH003("AUTH003", 200, "Account disabled"),
+    AUTH003("AUTH003", 200, "Operator authentication failed"),
 
     VCH001("VCH001", 200, "Voucher not found"),
     VCH002("VCH002", 200, "Voucher already used"),
-
-    BAL001("BAL001", 200, "Insufficient balance"),
-    BAL002("BAL002", 200, "Invalid amount"),
+    BAL001("BAL001", 200, "Invalid amount"),
+    BAL002("BAL002", 200, "Insufficient balance"),
 
     SUB002("SUB002", 200, "Subscriber not active"),
     SUB404("SUB404", 200, "Subscriber not found"),
-
-    TXN002("TXN002", 200, "Transaction already refunded"),
-    TXN003("TXN003", 200, "Transaction cannot be refunded"),
+    TXN002("TXN002", 200, "Reference number already used"),
+    TXN003("TXN003", 200, "Transaction already refunded"),
     TXN404("TXN404", 200, "Transaction not found");
 
     private final String code;
