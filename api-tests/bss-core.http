@@ -85,3 +85,68 @@ msisdn=01512345678&pin=2222
 ### Youssef profile: OLD99 tariff, zero balance, 12/08/2016 activation
 # Expected: {"RESULT":"OK","DATA":{"MSISDN":"01512345678","FULL_NAME":"Youssef Fathy","STATUS":"A","TARIFF_CODE":"OLD99","TARIFF_NAME":"Classic 2015","BALANCE_PIASTERS":0,"ACTIVATION_DT":"12/08/2016"}}
 GET {{baseUrl}}/subscriber/me
+
+### L-05 acceptance: log Mona in from a clean seed (balance 6750)
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01012345678&pin=1234
+
+### L-05 acceptance: debit Mona 3500 piasters
+# Expected: {"RESULT":"OK","DATA":{"TXN_ID":50231,"BALANCE_PIASTERS":3250}}
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=3500&refNo=SC-20261012-000015&reason=BUNDLE+Weekly+Mix
+
+### L-05 acceptance: verify Mona's new balance
+# Expected DATA contains "BALANCE_PIASTERS":3250
+GET {{baseUrl}}/subscriber/me
+
+# Verify the persisted ledger entry in PostgreSQL:
+# SELECT txn_id, msisdn, txn_type, amount_piasters, balance_after, ref_no, reason
+# FROM ledger WHERE txn_id = 50231;
+# Expected one row: D, 3500, 3250, SC-20261012-000015, "BUNDLE Weekly Mix".
+
+### L-05 acceptance: log Karim in from a clean seed (balance 500)
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01123456789&pin=4321
+
+### L-05 acceptance: debit over Karim's balance
+# Expected HTTP 200: {"RESULT":"FAIL","ERR_CODE":"BAL002","ERR_MSG":"Insufficient balance"}
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=750&refNo=SC-20261012-000016&reason=BUNDLE+Weekly+Mix
+
+### L-05 acceptance: failed debit leaves Karim's balance unchanged
+# Expected DATA contains "BALANCE_PIASTERS":500
+GET {{baseUrl}}/subscriber/me
+
+# Verify the failed request created no ledger row:
+# SELECT count(*) FROM ledger WHERE ref_no = 'SC-20261012-000016';
+# Expected: 0.
+
+### L-05 acceptance: missing reason -> VAL001
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=100&refNo=SC-20261012-000017
+
+### L-05 acceptance: invalid refNo -> VAL001
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=100&refNo=ab&reason=BUNDLE+Weekly+Mix
+
+### L-05 acceptance: empty amountPiasters -> VAL001
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=&refNo=SC-20261012-000018&reason=BUNDLE+Weekly+Mix
+
+### Youssef profile: OLD99 tariff, zero balance, 12/08/2016 activation
+# Expected: {"RESULT":"OK","DATA":{"MSISDN":"01512345678","FULL_NAME":"Youssef Fathy","STATUS":"A","TARIFF_CODE":"OLD99","TARIFF_NAME":"Classic 2015","BALANCE_PIASTERS":0,"ACTIVATION_DT":"12/08/2016"}}
+GET {{baseUrl}}/subscriber/me

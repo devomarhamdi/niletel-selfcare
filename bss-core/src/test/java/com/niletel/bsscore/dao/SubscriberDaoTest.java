@@ -1,6 +1,7 @@
 package com.niletel.bsscore.dao;
 
 import com.niletel.bsscore.model.SubscriberRecord;
+import com.niletel.bsscore.model.BalanceSnapshot;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -69,5 +70,26 @@ class SubscriberDaoTest {
         verify(resultSet).close();
         verify(statement).close();
         verify(connection).close();
+    }
+
+    @Test
+    void locksBalanceAndReturnsBalanceAfterAtomicUpdate() throws Exception {
+        when(resultSet.next()).thenReturn(true, true);
+        when(resultSet.getString("status")).thenReturn("A");
+        when(resultSet.getInt("balance_piasters")).thenReturn(1000, 750);
+
+        assertEquals(Optional.of(new BalanceSnapshot("A", 1000)),
+                dao.lockBalance("01012345678"));
+        assertEquals(750, dao.deductBalance("01012345678", 250));
+
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains("FOR UPDATE"));
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains("UPDATE subscriber"));
+        verify(statement).setString(1, "01012345678");
+        verify(statement).setInt(1, 250);
+        verify(statement).setString(2, "01012345678");
+        verify(statement, org.mockito.Mockito.times(2)).executeQuery();
+        verify(resultSet, org.mockito.Mockito.times(2)).close();
+        verify(statement, org.mockito.Mockito.times(2)).close();
+        verify(connection, org.mockito.Mockito.times(2)).close();
     }
 }
