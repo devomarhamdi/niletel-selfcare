@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 @ApplicationScoped
 public class LedgerDao {
@@ -50,6 +51,51 @@ public class LedgerDao {
                 }
 
                 return rs.getLong("txn_id");
+            }
+        }
+    }
+
+    public boolean debitReferenceExists(String refNo) throws SQLException {
+        String query = """
+            SELECT 1
+            FROM ledger
+            WHERE txn_type = 'D' AND ref_no = ?
+        """;
+
+        try (Connection con = dataSource.getConnection();
+             PreparedStatement ps = con.prepareStatement(query)) {
+            ps.setString(1, refNo);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    public OptionalLong insertDebit(String msisdn, int amountPiasters,
+                                    int balanceAfter, String refNo, String reason)
+            throws SQLException {
+        String query = """
+            INSERT INTO ledger (
+                msisdn, txn_type, amount_piasters, balance_after, ref_no, reason
+            )
+            VALUES (?, 'D', ?, ?, ?, ?)
+            ON CONFLICT (ref_no) WHERE txn_type = 'D' DO NOTHING
+            RETURNING txn_id
+        """;
+
+        try (Connection con = dataSource.getConnection();
+             PreparedStatement ps = con.prepareStatement(query)) {
+            ps.setString(1, msisdn);
+            ps.setInt(2, amountPiasters);
+            ps.setInt(3, balanceAfter);
+            ps.setString(4, refNo);
+            ps.setString(5, reason);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return OptionalLong.of(rs.getLong("txn_id"));
+                }
+                return OptionalLong.empty();
             }
         }
     }

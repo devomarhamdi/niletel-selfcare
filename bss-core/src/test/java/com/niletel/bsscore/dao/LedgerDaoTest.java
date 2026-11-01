@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -62,6 +63,41 @@ class LedgerDaoTest {
 
         assertThrows(SQLException.class, () -> dao.insert(
                 "01012345678", "D", 500, 4500, "REF-001", "CALL CHARGE"
+        ));
+
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void insertDebitUsesConflictGuardAndReturnsGeneratedId() throws Exception {
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getLong("txn_id")).thenReturn(50231L);
+
+        assertEquals(OptionalLong.of(50231L), dao.insertDebit(
+                "01012345678", 500, 4500, "REF-001", "CALL CHARGE"
+        ));
+
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains(
+                "ON CONFLICT (ref_no) WHERE txn_type = 'D' DO NOTHING"
+        ));
+        verify(statement).setString(1, "01012345678");
+        verify(statement).setInt(2, 500);
+        verify(statement).setInt(3, 4500);
+        verify(statement).setString(4, "REF-001");
+        verify(statement).setString(5, "CALL CHARGE");
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void insertDebitReturnsEmptyWhenReferenceConflicts() throws Exception {
+        when(resultSet.next()).thenReturn(false);
+
+        assertEquals(OptionalLong.empty(), dao.insertDebit(
+                "01012345678", 500, 4500, "REF-001", "CALL CHARGE"
         ));
 
         verify(resultSet).close();

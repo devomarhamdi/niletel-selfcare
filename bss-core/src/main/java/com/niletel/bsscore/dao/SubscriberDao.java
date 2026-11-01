@@ -1,6 +1,7 @@
 package com.niletel.bsscore.dao;
 
 import com.niletel.bsscore.model.SubscriberRecord;
+import com.niletel.bsscore.model.BalanceSnapshot;
 import jakarta.annotation.Resource;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -36,6 +37,52 @@ public class SubscriberDao {
                     return Optional.of(mapRow(resultSet));
                 }
                 return Optional.empty();
+            }
+        }
+    }
+
+    public Optional<BalanceSnapshot> lockBalance(String msisdn) throws SQLException {
+        String query = """
+            SELECT status, balance_piasters
+            FROM subscriber
+            WHERE msisdn = ?
+            FOR UPDATE
+        """;
+
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setString(1, msisdn);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return Optional.empty();
+                }
+                return Optional.of(new BalanceSnapshot(
+                        resultSet.getString("status"),
+                        resultSet.getInt("balance_piasters")
+                ));
+            }
+        }
+    }
+
+    public int deductBalance(String msisdn, int amountPiasters) throws SQLException {
+        String query = """
+            UPDATE subscriber
+            SET balance_piasters = balance_piasters - ?
+            WHERE msisdn = ?
+            RETURNING balance_piasters
+        """;
+
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setInt(1, amountPiasters);
+            statement.setString(2, msisdn);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    throw new SQLException("Balance update returned no balance");
+                }
+                return resultSet.getInt("balance_piasters");
             }
         }
     }

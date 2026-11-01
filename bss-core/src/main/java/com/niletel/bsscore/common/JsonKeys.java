@@ -15,6 +15,7 @@ public final class JsonKeys {
     public static final String TARIFF_NAME = "TARIFF_NAME";
     public static final String BALANCE_PIASTERS = "BALANCE_PIASTERS";
     public static final String ACTIVATION_DT = "ACTIVATION_DT";
+    public static final String TXN_ID = "TXN_ID";
 
     public static final String RESULT_OK = "OK";
     public static final String RESULT_FAIL = "FAIL";
