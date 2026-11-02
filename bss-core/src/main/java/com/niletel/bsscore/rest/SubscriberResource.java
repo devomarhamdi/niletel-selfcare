@@ -25,17 +25,7 @@ public class SubscriberResource {
 
     @GET
     public Response getProfile(@Context HttpServletRequest request) {
-        HttpSession session = request.getSession(false);
-
-        if (session == null) {
-            throw new BusinessException(ErrorCode.SES001);
-        }
-
-        Object user =  session.getAttribute(SessionKeys.USER);
-
-        if (!(user instanceof String msisdn) || msisdn.isBlank()) {
-            throw new BusinessException(ErrorCode.SES001);
-        }
+        String msisdn = sessionMsisdn(request);
 
         SubscriberResponse subscriber = subscriberService.getProfile(msisdn);
 
@@ -51,15 +41,7 @@ public class SubscriberResource {
             @FormParam("reason") String reason,
             @Context HttpServletRequest request) {
 
-        HttpSession session = request.getSession(false);
-        if (session == null) {
-            throw new BusinessException(ErrorCode.SES001);
-        }
-
-        Object user =  session.getAttribute(SessionKeys.USER);
-        if (!(user instanceof String msisdn) || msisdn.isBlank()) {
-            throw new BusinessException(ErrorCode.SES001);
-        }
+        String msisdn = sessionMsisdn(request);
 
         if (amountPiasters == null || amountPiasters.isBlank()
             || !InputValidation.isTxnRefNo(refNo)
@@ -82,5 +64,19 @@ public class SubscriberResource {
                 .add(JsonKeys.TXN_ID, result.txnId())
                 .add(JsonKeys.BALANCE_PIASTERS, result.balanceAfter())
                 .build());
+    }
+
+    /** The subscriber behind the session (C11): the MSISDN is never taken from the request. */
+    private static String sessionMsisdn(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            throw new BusinessException(ErrorCode.SES001);
+        }
+
+        Object user = session.getAttribute(SessionKeys.USER);
+        if (!(user instanceof String msisdn) || msisdn.isBlank()) {
+            throw new BusinessException(ErrorCode.SES001);
+        }
+        return msisdn;
     }
 }
