@@ -179,6 +179,65 @@ class SubscriberResourceTest {
         verify(refundService, never()).refund("01012345678", "SC-20261012-000015");
     }
 
+    @Test
+    void missingOrEmptyRefundReferenceIsVal001BeforeServiceCall() throws Exception {
+        RefundService refundService = mock(RefundService.class);
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "refundService", refundService);
+
+        BusinessException missing = assertThrows(
+                BusinessException.class,
+                () -> resource.refund(null, debitRequest("01012345678"))
+        );
+        BusinessException empty = assertThrows(
+                BusinessException.class,
+                () -> resource.refund("", debitRequest("01012345678"))
+        );
+
+        assertEquals(ErrorCode.VAL001, missing.getErrorCode());
+        assertEquals(ErrorCode.VAL001, empty.getErrorCode());
+        verify(refundService, never()).refund("01012345678", "");
+    }
+
+    @Test
+    void refundWithoutSessionIsSes001BeforeAnyOtherCheck() throws Exception {
+        RefundService refundService = mock(RefundService.class);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getSession(false)).thenReturn(null);
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "refundService", refundService);
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> resource.refund("", request)
+        );
+
+        assertEquals(ErrorCode.SES001, error.getErrorCode());
+    }
+
+    @Test
+    void businessErrorsOfTheRefundServiceReachTheExceptionMapperUnchanged() throws Exception {
+        RefundService refundService = mock(RefundService.class);
+        when(refundService.refund("01012345678", "SC-20269999-000001"))
+                .thenThrow(new BusinessException(ErrorCode.TXN404));
+        when(refundService.refund("01012345678", "SC-20261009-000007"))
+                .thenThrow(new BusinessException(ErrorCode.TXN003));
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "refundService", refundService);
+
+        BusinessException unknown = assertThrows(
+                BusinessException.class,
+                () -> resource.refund("SC-20269999-000001", debitRequest("01012345678"))
+        );
+        BusinessException alreadyRefunded = assertThrows(
+                BusinessException.class,
+                () -> resource.refund("SC-20261009-000007", debitRequest("01012345678"))
+        );
+
+        assertEquals(ErrorCode.TXN404, unknown.getErrorCode());
+        assertEquals(ErrorCode.TXN003, alreadyRefunded.getErrorCode());
+    }
+
     private static HttpServletRequest debitRequest(String msisdn) {
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpSession session = mock(HttpSession.class);
