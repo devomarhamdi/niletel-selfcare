@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 @ApplicationScoped
@@ -96,6 +97,29 @@ public class LedgerDao {
                     return OptionalLong.of(rs.getLong("txn_id"));
                 }
                 return OptionalLong.empty();
+            }
+        }
+    }
+
+
+    /** Amount of the debit with this reference that belongs to this subscriber (a refund gives it back in full). */
+    public OptionalInt findDebitAmount(String msisdn, String refNo) throws SQLException {
+        String query = """
+            SELECT amount_piasters
+            FROM ledger
+            WHERE txn_type = 'D' AND ref_no = ? AND msisdn = ?
+        """;
+
+        try (Connection con = dataSource.getConnection();
+             PreparedStatement ps = con.prepareStatement(query)) {
+            ps.setString(1, refNo);
+            ps.setString(2, msisdn);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return OptionalInt.of(rs.getInt("amount_piasters"));
+                }
+                return OptionalInt.empty();
             }
         }
     }
