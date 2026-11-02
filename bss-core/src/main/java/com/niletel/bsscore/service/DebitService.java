@@ -14,6 +14,15 @@ import jakarta.inject.Inject;
 
 import java.sql.SQLException;
 
+/**
+ * Takes money out of a balance and writes the ledger row, in one transaction.
+ *
+ * <p>Order of the checks (Interface Contract C12, the first failure wins): VAL001 and BAL001 are decided before
+ * this bean is called (resource); here SUB002 (line suspended), TXN002 (reference already used by any
+ * subscriber) and BAL002 (insufficient balance) follow in this order. The status and the balance are read
+ * with the row lock held, never from the session, so a line suspended while its owner is logged in is
+ * refused at the next debit.
+ */
 @Stateless
 public class DebitService {
 
