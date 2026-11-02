@@ -234,3 +234,114 @@ POST {{baseUrl}}/subscriber/me/refund
 Content-Type: application/x-www-form-urlencoded
 
 refNo=SC-20261012-000015
+
+### L-24: log Mona in (clean seed, run after the L-05 and L-13 sections: balance 6750)
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01012345678&pin=1234
+
+# Order of the checks of the debit (C12, the first failure wins): VAL001, BAL001, SUB002, TXN002, BAL002.
+# Every FAIL below leaves the balance and the ledger unchanged.
+
+### L-24 BAL001: amount is not a number
+# Expected HTTP 200: {"RESULT":"FAIL","ERR_CODE":"BAL001","ERR_MSG":"Invalid amount"}
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=abc&refNo=SC-20261012-000040&reason=BUNDLE+Weekly+Mix
+
+### L-24 BAL001: decimal amount
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=12.5&refNo=SC-20261012-000040&reason=BUNDLE+Weekly+Mix
+
+### L-24 BAL001: zero
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=0&refNo=SC-20261012-000040&reason=BUNDLE+Weekly+Mix
+
+### L-24 BAL001: negative
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=-5&refNo=SC-20261012-000040&reason=BUNDLE+Weekly+Mix
+
+### L-24 BAL001: above the maximum 10000000
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=10000001&refNo=SC-20261012-000040&reason=BUNDLE+Weekly+Mix
+
+### L-24 BAL001: a sign is not a whole number ("+100")
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=%2B100&refNo=SC-20261012-000040&reason=BUNDLE+Weekly+Mix
+
+### L-24 BAL001: values are never trimmed (" 100")
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=%20100&refNo=SC-20261012-000040&reason=BUNDLE+Weekly+Mix
+
+### L-24 VAL001: amount missing (a missing or empty amount is VAL001, not BAL001)
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+refNo=SC-20261012-000040&reason=BUNDLE+Weekly+Mix
+
+### L-24 VAL001 comes before BAL001: invalid amount AND invalid refNo
+# Expected: VAL001
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=abc&refNo=ab&reason=BUNDLE+Weekly+Mix
+
+### L-24 TXN002: reference already used by a debit (seed row 50212, Mona)
+# Expected HTTP 200: {"RESULT":"FAIL","ERR_CODE":"TXN002","ERR_MSG":"Reference number already used"}
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=100&refNo=SC-20261008-000004&reason=BUNDLE+Social+Day
+
+### L-24 TXN002 comes before BAL002: used reference AND amount over the balance
+# Expected: TXN002
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=10000000&refNo=SC-20261008-000004&reason=BUNDLE+Social+Day
+
+### L-24 BAL002: unused reference, amount over the balance
+# Expected: BAL002 (balance and ledger unchanged)
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=10000000&refNo=SC-20261012-000041&reason=BUNDLE+Monthly+Max
+
+### L-24 SUB002: suspended line (status is read from the database at every debit)
+# 1. In PostgreSQL: UPDATE subscriber SET status = 'S' WHERE msisdn = '01012345678';
+# 2. Send the debit below (Mona is still logged in). Expected: SUB002.
+# 3. Also expected while suspended: a used reference or an amount over the balance still gives SUB002 (it is checked
+#    before TXN002 and BAL002); an invalid amount still gives BAL001 and an empty one VAL001 (checked before SUB002).
+#    GET {{baseUrl}}/subscriber/me still works (a logged-in subscriber can still read).
+# 4. Revert: UPDATE subscriber SET status = 'A' WHERE msisdn = '01012345678';
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=100&refNo=SC-20261012-000042&reason=BUNDLE+Social+Day
+
+### L-24: Karim logs in and uses a reference that belongs to Mona's debit
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01123456789&pin=4321
+
+### L-24 TXN002 for any subscriber: Karim sends the reference of Mona's seed debit
+# Expected: TXN002 (the reference is unique in the whole system)
+POST {{baseUrl}}/subscriber/me/debit
+Content-Type: application/x-www-form-urlencoded
+
+amountPiasters=100&refNo=SC-20261008-000004&reason=BUNDLE+Social+Day

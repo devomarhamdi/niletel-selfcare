@@ -204,6 +204,7 @@ The fixed test accounts are in section 4 of the Interface Contract. The main dem
 |---|---|---|---|
 | L-06 | bss-core `GET /health` | done | `UP` / `DOWN` from `SELECT 1` |
 | L-13 | bss-core `POST /subscriber/me/refund` | done | Whole debit given back once, only to the debited subscriber; `TXN404`, `TXN003`; a suspended line can still be refunded. One transaction under a row lock on the subscriber; the unique index `uq_ledger_refund_ref` stops two refunds at the same moment. |
+| L-24 | bss-core debit errors `BAL001`, `SUB002`, `TXN002` and the order of checks | done | Order `VAL001`, `BAL001`, `SUB002`, `TXN002`, `BAL002` (first failure wins). The amount must be plain ASCII digits, 1 to 10000000, never trimmed (`+100`, ` 100`, `12.5`, non-ASCII digits are `BAL001`; missing or empty is `VAL001`). The suspended status is read under the row lock at every debit, never from the session. A reference used by any subscriber is `TXN002`; two debits with one reference at the same moment write one row (`ON CONFLICT` on `uq_ledger_debit_ref`). |
 | | | | |
 
 Done so far: the project skeleton, Docker setup, the health endpoints and the folder structure. No business feature is built yet.

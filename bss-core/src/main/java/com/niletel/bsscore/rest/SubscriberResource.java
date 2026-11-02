@@ -48,21 +48,16 @@ public class SubscriberResource {
 
         String msisdn = sessionMsisdn(request);
 
-        if (amountPiasters == null || amountPiasters.isBlank()
+        // Order of checks (C12): VAL001 first. A missing or empty amount is VAL001; an amount that is
+        // present but not a whole number from 1 to 10000000 is BAL001 (values are never trimmed).
+        if (amountPiasters == null || amountPiasters.isEmpty()
             || !InputValidation.isTxnRefNo(refNo)
             || !InputValidation.isTxnReason(reason)) {
             throw new BusinessException(ErrorCode.VAL001);
         }
 
-        final int parsedAmount;
-        try {
-            parsedAmount = Integer.parseInt(amountPiasters);
-        } catch (NumberFormatException e) {
-            throw new BusinessException(ErrorCode.BAL001);
-        }
-        if (!InputValidation.isDebitAmount(parsedAmount)) {
-            throw new BusinessException(ErrorCode.BAL001);
-        }
+        int parsedAmount = InputValidation.parseDebitAmount(amountPiasters)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BAL001));
 
         DebitResult result = debitService.debit(msisdn, parsedAmount, refNo, reason);
         return ApiResponse.ok(Json.createObjectBuilder()

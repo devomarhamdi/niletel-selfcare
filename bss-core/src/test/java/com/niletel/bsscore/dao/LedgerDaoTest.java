@@ -233,4 +233,32 @@ class LedgerDaoTest {
         verify(statement).close();
         verify(connection).close();
     }
+
+    @Test
+    void debitReferenceExistsChecksEverySubscriberNotOnlyTheCaller() throws Exception {
+        when(resultSet.next()).thenReturn(true);
+
+        assertTrue(dao.debitReferenceExists("SC-20261012-000015"));
+
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains(
+                "WHERE txn_type = 'D' AND ref_no = ?"
+        ));
+        verify(statement).setString(1, "SC-20261012-000015");
+        verify(statement, org.mockito.Mockito.never()).setString(
+                org.mockito.ArgumentMatchers.eq(2), org.mockito.ArgumentMatchers.anyString());
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void debitReferenceExistsIsFalseForAnUnusedReference() throws Exception {
+        when(resultSet.next()).thenReturn(false);
+
+        assertFalse(dao.debitReferenceExists("SC-20261012-000099"));
+
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
 }

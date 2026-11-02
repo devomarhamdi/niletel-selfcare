@@ -12,6 +12,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
@@ -236,6 +238,79 @@ class SubscriberResourceTest {
 
         assertEquals(ErrorCode.TXN404, unknown.getErrorCode());
         assertEquals(ErrorCode.TXN003, alreadyRefunded.getErrorCode());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abc", "12.5", "0", "-5", "10000001", "99999999999", "+100", " 100", "100 ", " ",
+            "\u0661\u0660\u0660"})
+    void invalidDebitAmountIsBal001AndNeverReachesTheService(String amount) throws Exception {
+        DebitService debitService = mock(DebitService.class);
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "debitService", debitService);
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> resource.debit(amount, "SC-20261012-000015", "BUNDLE Weekly Mix", debitRequest("01012345678"))
+        );
+
+        assertEquals(ErrorCode.BAL001, error.getErrorCode());
+        org.mockito.Mockito.verifyNoInteractions(debitService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1", "10000000"})
+    void boundaryDebitAmountsAreAcceptedAndPassedToTheService(String amount) throws Exception {
+        DebitService debitService = mock(DebitService.class);
+        int parsed = Integer.parseInt(amount);
+        when(debitService.debit("01012345678", parsed, "SC-20261012-000015", "BUNDLE Weekly Mix"))
+                .thenReturn(new DebitResult(50231L, 0));
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "debitService", debitService);
+
+        Response response = resource.debit(
+                amount, "SC-20261012-000015", "BUNDLE Weekly Mix", debitRequest("01012345678"));
+
+        assertEquals(200, response.getStatus());
+        verify(debitService).debit("01012345678", parsed, "SC-20261012-000015", "BUNDLE Weekly Mix");
+    }
+
+    @Test
+    void validationErrorComesBeforeInvalidAmountError() throws Exception {
+        DebitService debitService = mock(DebitService.class);
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "debitService", debitService);
+
+        BusinessException badReference = assertThrows(
+                BusinessException.class,
+                () -> resource.debit("abc", "ab", "BUNDLE Weekly Mix", debitRequest("01012345678"))
+        );
+        BusinessException missingReason = assertThrows(
+                BusinessException.class,
+                () -> resource.debit("0", "SC-20261012-000015", null, debitRequest("01012345678"))
+        );
+        BusinessException blankReason = assertThrows(
+                BusinessException.class,
+                () -> resource.debit("0", "SC-20261012-000015", "   ", debitRequest("01012345678"))
+        );
+
+        assertEquals(ErrorCode.VAL001, badReference.getErrorCode());
+        assertEquals(ErrorCode.VAL001, missingReason.getErrorCode());
+        assertEquals(ErrorCode.VAL001, blankReason.getErrorCode());
+        org.mockito.Mockito.verifyNoInteractions(debitService);
+    }
+
+    @Test
+    void missingAmountIsValidationErrorNotInvalidAmount() throws Exception {
+        DebitService debitService = mock(DebitService.class);
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "debitService", debitService);
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> resource.debit(null, "SC-20261012-000015", "BUNDLE Weekly Mix", debitRequest("01012345678"))
+        );
+
+        assertEquals(ErrorCode.VAL001, error.getErrorCode());
     }
 
     private static HttpServletRequest debitRequest(String msisdn) {
