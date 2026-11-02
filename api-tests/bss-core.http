@@ -150,3 +150,87 @@ amountPiasters=&refNo=SC-20261012-000018&reason=BUNDLE+Weekly+Mix
 ### Youssef profile: OLD99 tariff, zero balance, 12/08/2016 activation
 # Expected: {"RESULT":"OK","DATA":{"MSISDN":"01512345678","FULL_NAME":"Youssef Fathy","STATUS":"A","TARIFF_CODE":"OLD99","TARIFF_NAME":"Classic 2015","BALANCE_PIASTERS":0,"ACTIVATION_DT":"12/08/2016"}}
 GET {{baseUrl}}/subscriber/me
+
+### L-13 acceptance: log Mona in
+# Run the L-05 debit of SC-20261012-000015 above first, from a clean seed (Mona's balance is then 3250).
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01012345678&pin=1234
+
+### L-13 acceptance: refund the debit SC-20261012-000015 in full
+# Expected: {"RESULT":"OK","DATA":{"TXN_ID":50232,"AMOUNT_PIASTERS":3500,"BALANCE_PIASTERS":6750}}
+POST {{baseUrl}}/subscriber/me/refund
+Content-Type: application/x-www-form-urlencoded
+
+refNo=SC-20261012-000015
+
+### L-13 acceptance: verify Mona's balance is back to 6750
+# Expected DATA contains "BALANCE_PIASTERS":6750
+GET {{baseUrl}}/subscriber/me
+
+# Verify the refund row in PostgreSQL:
+# SELECT txn_id, txn_type, amount_piasters, balance_after, ref_no, reason FROM ledger WHERE txn_id = 50232;
+# Expected one row: F, 3500, 6750, SC-20261012-000015, REFUND.
+
+### L-13 error: the same refund again -> TXN003
+# Expected HTTP 200: {"RESULT":"FAIL","ERR_CODE":"TXN003","ERR_MSG":"Transaction already refunded"}
+POST {{baseUrl}}/subscriber/me/refund
+Content-Type: application/x-www-form-urlencoded
+
+refNo=SC-20261012-000015
+
+### L-13 error: the seed debit that was already refunded (ledger rows 50215/50216) -> TXN003
+POST {{baseUrl}}/subscriber/me/refund
+Content-Type: application/x-www-form-urlencoded
+
+refNo=SC-20261009-000007
+
+### L-13 error: reference number that no debit has -> TXN404
+# Expected HTTP 200: {"RESULT":"FAIL","ERR_CODE":"TXN404","ERR_MSG":"Transaction not found"}
+POST {{baseUrl}}/subscriber/me/refund
+Content-Type: application/x-www-form-urlencoded
+
+refNo=SC-20269999-000001
+
+### L-13 error: empty refNo -> VAL001
+POST {{baseUrl}}/subscriber/me/refund
+Content-Type: application/x-www-form-urlencoded
+
+refNo=
+
+### L-13 error: refNo field missing -> VAL001
+POST {{baseUrl}}/subscriber/me/refund
+Content-Type: application/x-www-form-urlencoded
+
+other=1
+
+### L-13 error: no valid session -> HTTP 401 SES001
+POST {{baseUrl}}/subscriber/me/refund
+Cookie: JSESSIONID=not-a-valid-session
+Content-Type: application/x-www-form-urlencoded
+
+refNo=SC-20261012-000015
+
+### L-13 acceptance: a suspended line can still be refunded (business rule 5)
+# 1. Log Mona in and debit: amountPiasters=500&refNo=SC-20261012-000020&reason=BUNDLE+Social+Day
+# 2. In PostgreSQL: UPDATE subscriber SET status = 'S' WHERE msisdn = '01012345678';
+# 3. Send the refund below. Expected OK with AMOUNT_PIASTERS 500 (a new debit would now answer SUB002).
+# 4. Revert: UPDATE subscriber SET status = 'A' WHERE msisdn = '01012345678';
+POST {{baseUrl}}/subscriber/me/refund
+Content-Type: application/x-www-form-urlencoded
+
+refNo=SC-20261012-000020
+
+### L-13 error: Karim logs in and tries to refund Mona's debit -> TXN404
+# A debit of another subscriber counts as "no debit with this reference number".
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+msisdn=01123456789&pin=4321
+
+### L-13 error: Karim refunds Mona's reference -> TXN404
+POST {{baseUrl}}/subscriber/me/refund
+Content-Type: application/x-www-form-urlencoded
+
+refNo=SC-20261012-000015

@@ -9,10 +9,12 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -91,5 +93,32 @@ class SubscriberDaoTest {
         verify(resultSet, org.mockito.Mockito.times(2)).close();
         verify(statement, org.mockito.Mockito.times(2)).close();
         verify(connection, org.mockito.Mockito.times(2)).close();
+    }
+
+    @Test
+    void creditBalanceAddsAmountInOneStatementAndReturnsBalanceAfter() throws Exception {
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getInt("balance_piasters")).thenReturn(6750);
+
+        assertEquals(6750, dao.creditBalance("01012345678", 3500));
+
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains("balance_piasters + ?"));
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains("RETURNING balance_piasters"));
+        verify(statement).setInt(1, 3500);
+        verify(statement).setString(2, "01012345678");
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void creditBalanceFailsWhenNoRowWasUpdated() throws Exception {
+        when(resultSet.next()).thenReturn(false);
+
+        assertThrows(SQLException.class, () -> dao.creditBalance("01000000000", 100));
+
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
     }
 }

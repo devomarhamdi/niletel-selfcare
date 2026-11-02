@@ -11,9 +11,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -137,6 +139,96 @@ class LedgerDaoTest {
         assertTrue(dao.findById(99999L).isEmpty());
 
         verify(statement).setLong(1, 99999L);
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void findDebitAmountLooksUpTheDebitOfThatSubscriberOnly() throws Exception {
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getInt("amount_piasters")).thenReturn(3500);
+
+        assertEquals(OptionalInt.of(3500), dao.findDebitAmount("01012345678", "SC-20261012-000015"));
+
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains(
+                "WHERE txn_type = 'D' AND ref_no = ? AND msisdn = ?"
+        ));
+        verify(statement).setString(1, "SC-20261012-000015");
+        verify(statement).setString(2, "01012345678");
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void findDebitAmountReturnsEmptyWhenSubscriberHasNoSuchDebit() throws Exception {
+        when(resultSet.next()).thenReturn(false);
+
+        assertEquals(OptionalInt.empty(), dao.findDebitAmount("01123456789", "SC-20261012-000015"));
+
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void refundReferenceExistsOnlyLooksAtRefundRows() throws Exception {
+        when(resultSet.next()).thenReturn(true);
+
+        assertTrue(dao.refundReferenceExists("SC-20261009-000007"));
+
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains(
+                "WHERE txn_type = 'F' AND ref_no = ?"
+        ));
+        verify(statement).setString(1, "SC-20261009-000007");
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void refundReferenceExistsIsFalseWhenDebitWasNeverRefunded() throws Exception {
+        when(resultSet.next()).thenReturn(false);
+
+        assertFalse(dao.refundReferenceExists("SC-20261012-000015"));
+
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void insertRefundUsesConflictGuardAndReturnsGeneratedId() throws Exception {
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getLong("txn_id")).thenReturn(50232L);
+
+        assertEquals(OptionalLong.of(50232L), dao.insertRefund(
+                "01012345678", 3500, 6750, "SC-20261012-000015", "REFUND"
+        ));
+
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains("VALUES (?, 'F', ?, ?, ?, ?)"));
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains(
+                "ON CONFLICT (ref_no) WHERE txn_type = 'F' DO NOTHING"
+        ));
+        verify(statement).setString(1, "01012345678");
+        verify(statement).setInt(2, 3500);
+        verify(statement).setInt(3, 6750);
+        verify(statement).setString(4, "SC-20261012-000015");
+        verify(statement).setString(5, "REFUND");
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void insertRefundReturnsEmptyWhenTheDebitWasAlreadyRefunded() throws Exception {
+        when(resultSet.next()).thenReturn(false);
+
+        assertEquals(OptionalLong.empty(), dao.insertRefund(
+                "01012345678", 3500, 6750, "SC-20261012-000015", "REFUND"
+        ));
+
         verify(resultSet).close();
         verify(statement).close();
         verify(connection).close();

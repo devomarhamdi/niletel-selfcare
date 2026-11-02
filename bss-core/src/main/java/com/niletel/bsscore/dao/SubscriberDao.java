@@ -87,6 +87,29 @@ public class SubscriberDao {
         }
     }
 
+    /** Adds money to the balance in one statement and returns the balance after the change. */
+    public int creditBalance(String msisdn, int amountPiasters) throws SQLException {
+        String query = """
+            UPDATE subscriber
+            SET balance_piasters = balance_piasters + ?
+            WHERE msisdn = ?
+            RETURNING balance_piasters
+        """;
+
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(query)) {
+            statement.setInt(1, amountPiasters);
+            statement.setString(2, msisdn);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    throw new SQLException("Balance update returned no balance");
+                }
+                return resultSet.getInt("balance_piasters");
+            }
+        }
+    }
+
     private SubscriberRecord mapRow(ResultSet resultSet) throws SQLException {
         return new SubscriberRecord(
                 resultSet.getString("msisdn"),

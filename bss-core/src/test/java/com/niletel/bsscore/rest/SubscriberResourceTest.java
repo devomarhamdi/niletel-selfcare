@@ -3,8 +3,10 @@ package com.niletel.bsscore.rest;
 import com.niletel.bsscore.common.BusinessException;
 import com.niletel.bsscore.common.ErrorCode;
 import com.niletel.bsscore.model.DebitResult;
+import com.niletel.bsscore.model.RefundResult;
 import com.niletel.bsscore.model.SubscriberResponse;
 import com.niletel.bsscore.service.DebitService;
+import com.niletel.bsscore.service.RefundService;
 import com.niletel.bsscore.service.SubscriberService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -140,6 +142,100 @@ class SubscriberResourceTest {
         verify(debitService, never()).debit(
                 "01012345678", 0, "REF-001", "Call charge"
         );
+    }
+
+    @Test
+    void refundReturnsLedgerIdAmountGivenBackAndBalanceAfter() throws Exception {
+        RefundService refundService = mock(RefundService.class);
+        when(refundService.refund("01012345678", "SC-20261012-000015"))
+                .thenReturn(new RefundResult(50232L, 3500, 6750));
+
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "refundService", refundService);
+
+        Response response = resource.refund("SC-20261012-000015", debitRequest("01012345678"));
+
+        assertEquals(200, response.getStatus());
+        assertEquals(
+                "{\"RESULT\":\"OK\",\"DATA\":{\"TXN_ID\":50232,"
+                        + "\"AMOUNT_PIASTERS\":3500,\"BALANCE_PIASTERS\":6750}}",
+                response.getEntity()
+        );
+        verify(refundService).refund("01012345678", "SC-20261012-000015");
+    }
+
+    @Test
+    void refundUsesTheSessionMsisdnOfTheCallerOnly() throws Exception {
+        RefundService refundService = mock(RefundService.class);
+        when(refundService.refund("01123456789", "SC-20261012-000015"))
+                .thenReturn(new RefundResult(50233L, 750, 1250));
+
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "refundService", refundService);
+
+        resource.refund("SC-20261012-000015", debitRequest("01123456789"));
+
+        verify(refundService).refund("01123456789", "SC-20261012-000015");
+        verify(refundService, never()).refund("01012345678", "SC-20261012-000015");
+    }
+
+    @Test
+    void missingOrEmptyRefundReferenceIsVal001BeforeServiceCall() throws Exception {
+        RefundService refundService = mock(RefundService.class);
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "refundService", refundService);
+
+        BusinessException missing = assertThrows(
+                BusinessException.class,
+                () -> resource.refund(null, debitRequest("01012345678"))
+        );
+        BusinessException empty = assertThrows(
+                BusinessException.class,
+                () -> resource.refund("", debitRequest("01012345678"))
+        );
+
+        assertEquals(ErrorCode.VAL001, missing.getErrorCode());
+        assertEquals(ErrorCode.VAL001, empty.getErrorCode());
+        verify(refundService, never()).refund("01012345678", "");
+    }
+
+    @Test
+    void refundWithoutSessionIsSes001BeforeAnyOtherCheck() throws Exception {
+        RefundService refundService = mock(RefundService.class);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getSession(false)).thenReturn(null);
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "refundService", refundService);
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> resource.refund("", request)
+        );
+
+        assertEquals(ErrorCode.SES001, error.getErrorCode());
+    }
+
+    @Test
+    void businessErrorsOfTheRefundServiceReachTheExceptionMapperUnchanged() throws Exception {
+        RefundService refundService = mock(RefundService.class);
+        when(refundService.refund("01012345678", "SC-20269999-000001"))
+                .thenThrow(new BusinessException(ErrorCode.TXN404));
+        when(refundService.refund("01012345678", "SC-20261009-000007"))
+                .thenThrow(new BusinessException(ErrorCode.TXN003));
+        SubscriberResource resource = new SubscriberResource();
+        setField(resource, "refundService", refundService);
+
+        BusinessException unknown = assertThrows(
+                BusinessException.class,
+                () -> resource.refund("SC-20269999-000001", debitRequest("01012345678"))
+        );
+        BusinessException alreadyRefunded = assertThrows(
+                BusinessException.class,
+                () -> resource.refund("SC-20261009-000007", debitRequest("01012345678"))
+        );
+
+        assertEquals(ErrorCode.TXN404, unknown.getErrorCode());
+        assertEquals(ErrorCode.TXN003, alreadyRefunded.getErrorCode());
     }
 
     private static HttpServletRequest debitRequest(String msisdn) {
