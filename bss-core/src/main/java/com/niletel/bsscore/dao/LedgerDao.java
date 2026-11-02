@@ -125,6 +125,24 @@ public class LedgerDao {
     }
 
 
+    /** True when a refund (type F) with this reference already exists: a debit is refunded once. */
+    public boolean refundReferenceExists(String refNo) throws SQLException {
+        String query = """
+            SELECT 1
+            FROM ledger
+            WHERE txn_type = 'F' AND ref_no = ?
+        """;
+
+        try (Connection con = dataSource.getConnection();
+             PreparedStatement ps = con.prepareStatement(query)) {
+            ps.setString(1, refNo);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+
     public Optional<LedgerRecord> findById(long txnId)
             throws SQLException {
 
