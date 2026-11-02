@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -137,6 +138,34 @@ class LedgerDaoTest {
         assertTrue(dao.findById(99999L).isEmpty());
 
         verify(statement).setLong(1, 99999L);
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void findDebitAmountLooksUpTheDebitOfThatSubscriberOnly() throws Exception {
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getInt("amount_piasters")).thenReturn(3500);
+
+        assertEquals(OptionalInt.of(3500), dao.findDebitAmount("01012345678", "SC-20261012-000015"));
+
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains(
+                "WHERE txn_type = 'D' AND ref_no = ? AND msisdn = ?"
+        ));
+        verify(statement).setString(1, "SC-20261012-000015");
+        verify(statement).setString(2, "01012345678");
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void findDebitAmountReturnsEmptyWhenSubscriberHasNoSuchDebit() throws Exception {
+        when(resultSet.next()).thenReturn(false);
+
+        assertEquals(OptionalInt.empty(), dao.findDebitAmount("01123456789", "SC-20261012-000015"));
+
         verify(resultSet).close();
         verify(statement).close();
         verify(connection).close();
