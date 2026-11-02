@@ -9,11 +9,15 @@ import com.niletel.bsscore.model.BalanceSnapshot;
 import com.niletel.bsscore.model.DebitResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InOrder;
 
 import java.sql.SQLException;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -154,5 +158,49 @@ class DebitServiceTest {
         order.verify(ledgerDao).insertDebit(
                 "01012345678", 250, 750, "REF-001", "Call charge"
         );
+    }
+
+    static Stream<Arguments> failuresThatCanHappenTogether() {
+        // status, balance, reference already used, expected first error (order: SUB002, TXN002, BAL002)
+        return Stream.of(
+                Arguments.of("S", 100, true, ErrorCode.SUB002),
+                Arguments.of("S", 100, false, ErrorCode.SUB002),
+                Arguments.of("S", 1000, true, ErrorCode.SUB002),
+                Arguments.of("S", 1000, false, ErrorCode.SUB002),
+                Arguments.of("A", 100, true, ErrorCode.TXN002),
+                Arguments.of("A", 1000, true, ErrorCode.TXN002),
+                Arguments.of("A", 100, false, ErrorCode.BAL002)
+        );
+    }
+
+    @ParameterizedTest(name = "status {0}, balance {1}, reference used {2} -> {3}")
+    @MethodSource("failuresThatCanHappenTogether")
+    void firstFailureInTheContractOrderWinsAndNothingIsWritten(
+            String status, int balance, boolean referenceUsed, ErrorCode expected) throws Exception {
+        when(subscriberDao.lockBalance("01012345678"))
+                .thenReturn(Optional.of(new BalanceSnapshot(status, balance)));
+        when(ledgerDao.debitReferenceExists("REF-001")).thenReturn(referenceUsed);
+
+        BusinessException error = assertThrows(
+                BusinessException.class,
+                () -> service.debit("01012345678", 250, "REF-001", "Call charge")
+        );
+
+        assertEquals(expected, error.getErrorCode());
+        verify(subscriberDao, never()).deductBalance("01012345678", 250);
+        verify(ledgerDao, never()).insertDebit("01012345678", 250, 0, "REF-001", "Call charge");
+    }
+
+    @Test
+    void balanceEqualToTheAmountIsEnoughAndLeavesZero() throws Exception {
+        when(subscriberDao.lockBalance("01012345678"))
+                .thenReturn(Optional.of(new BalanceSnapshot("A", 250)));
+        when(ledgerDao.debitReferenceExists("REF-001")).thenReturn(false);
+        when(subscriberDao.deductBalance("01012345678", 250)).thenReturn(0);
+        when(ledgerDao.insertDebit("01012345678", 250, 0, "REF-001", "Call charge"))
+                .thenReturn(OptionalLong.of(50231L));
+
+        assertEquals(new DebitResult(50231L, 0),
+                service.debit("01012345678", 250, "REF-001", "Call charge"));
     }
 }
