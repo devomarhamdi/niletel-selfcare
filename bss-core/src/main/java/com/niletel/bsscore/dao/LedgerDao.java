@@ -102,6 +102,40 @@ public class LedgerDao {
     }
 
 
+    /**
+     * Writes the refund row (type F) with the reference of the refunded debit. The unique index on refunds makes
+     * two refunds of one debit impossible: when a row already exists nothing is written and the result is empty.
+     */
+    public OptionalLong insertRefund(String msisdn, int amountPiasters,
+                                     int balanceAfter, String refNo, String reason)
+            throws SQLException {
+        String query = """
+            INSERT INTO ledger (
+                msisdn, txn_type, amount_piasters, balance_after, ref_no, reason
+            )
+            VALUES (?, 'F', ?, ?, ?, ?)
+            ON CONFLICT (ref_no) WHERE txn_type = 'F' DO NOTHING
+            RETURNING txn_id
+        """;
+
+        try (Connection con = dataSource.getConnection();
+             PreparedStatement ps = con.prepareStatement(query)) {
+            ps.setString(1, msisdn);
+            ps.setInt(2, amountPiasters);
+            ps.setInt(3, balanceAfter);
+            ps.setString(4, refNo);
+            ps.setString(5, reason);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return OptionalLong.of(rs.getLong("txn_id"));
+                }
+                return OptionalLong.empty();
+            }
+        }
+    }
+
+
     /** Amount of the debit with this reference that belongs to this subscriber (a refund gives it back in full). */
     public OptionalInt findDebitAmount(String msisdn, String refNo) throws SQLException {
         String query = """
