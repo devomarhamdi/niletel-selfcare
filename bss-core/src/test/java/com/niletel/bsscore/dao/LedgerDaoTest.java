@@ -197,4 +197,40 @@ class LedgerDaoTest {
         verify(statement).close();
         verify(connection).close();
     }
+
+    @Test
+    void insertRefundUsesConflictGuardAndReturnsGeneratedId() throws Exception {
+        when(resultSet.next()).thenReturn(true);
+        when(resultSet.getLong("txn_id")).thenReturn(50232L);
+
+        assertEquals(OptionalLong.of(50232L), dao.insertRefund(
+                "01012345678", 3500, 6750, "SC-20261012-000015", "REFUND"
+        ));
+
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains("VALUES (?, 'F', ?, ?, ?, ?)"));
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains(
+                "ON CONFLICT (ref_no) WHERE txn_type = 'F' DO NOTHING"
+        ));
+        verify(statement).setString(1, "01012345678");
+        verify(statement).setInt(2, 3500);
+        verify(statement).setInt(3, 6750);
+        verify(statement).setString(4, "SC-20261012-000015");
+        verify(statement).setString(5, "REFUND");
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void insertRefundReturnsEmptyWhenTheDebitWasAlreadyRefunded() throws Exception {
+        when(resultSet.next()).thenReturn(false);
+
+        assertEquals(OptionalLong.empty(), dao.insertRefund(
+                "01012345678", 3500, 6750, "SC-20261012-000015", "REFUND"
+        ));
+
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
 }
