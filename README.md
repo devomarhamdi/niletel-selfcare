@@ -203,6 +203,7 @@ The fixed test accounts are in section 4 of the Interface Contract. The main dem
 | Id | Requirement | Status | Notes |
 |---|---|---|---|
 | L-06 | bss-core `GET /health` | done | `UP` / `DOWN` from `SELECT 1` |
+| L-13 | bss-core `POST /subscriber/me/refund` | done | Whole debit given back once, only to the debited subscriber; `TXN404`, `TXN003`; a suspended line can still be refunded. One transaction under a row lock on the subscriber; the unique index `uq_ledger_refund_ref` stops two refunds at the same moment. |
 | | | | |
 
 Done so far: the project skeleton, Docker setup, the health endpoints and the folder structure. No business feature is built yet.
