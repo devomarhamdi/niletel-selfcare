@@ -1,5 +1,7 @@
 package com.niletel.bsscore.service;
 
+import com.niletel.bsscore.common.BusinessException;
+import com.niletel.bsscore.common.ErrorCode;
 import com.niletel.bsscore.dao.LedgerDao;
 import com.niletel.bsscore.dao.SubscriberDao;
 import com.niletel.bsscore.model.BalanceSnapshot;
@@ -13,8 +15,11 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RefundServiceTest {
@@ -60,6 +65,70 @@ class RefundServiceTest {
                 .thenReturn(OptionalLong.of(50240L));
 
         assertEquals(new RefundResult(50240L, 500, 9999), service.refund(MSISDN, REF_NO));
+    }
+
+    @Test
+    void unknownReferenceOfThisSubscriberIsTxn404AndChangesNothing() throws Exception {
+        when(subscriberDao.lockBalance(MSISDN)).thenReturn(Optional.of(new BalanceSnapshot("A", 3250)));
+        when(ledgerDao.findDebitAmount(MSISDN, REF_NO)).thenReturn(OptionalInt.empty());
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.refund(MSISDN, REF_NO));
+
+        assertEquals(ErrorCode.TXN404, error.getErrorCode());
+        verify(ledgerDao, never()).refundReferenceExists(REF_NO);
+        verify(subscriberDao, never()).creditBalance(MSISDN, 3500);
+        verify(ledgerDao, never()).insertRefund(MSISDN, 3500, 6750, REF_NO, "REFUND");
+    }
+
+    @Test
+    void debitOfAnotherSubscriberIsTxn404BecauseTheLookupIsScopedToTheCaller() throws Exception {
+        when(subscriberDao.lockBalance("01123456789")).thenReturn(Optional.of(new BalanceSnapshot("A", 500)));
+        when(ledgerDao.findDebitAmount("01123456789", REF_NO)).thenReturn(OptionalInt.empty());
+
+        BusinessException error = assertThrows(
+                BusinessException.class, () -> service.refund("01123456789", REF_NO));
+
+        assertEquals(ErrorCode.TXN404, error.getErrorCode());
+        verify(ledgerDao).findDebitAmount("01123456789", REF_NO);
+        verify(subscriberDao, never()).creditBalance("01123456789", 3500);
+    }
+
+    @Test
+    void alreadyRefundedDebitIsTxn003BeforeAnyMoneyMoves() throws Exception {
+        when(subscriberDao.lockBalance(MSISDN)).thenReturn(Optional.of(new BalanceSnapshot("A", 6750)));
+        when(ledgerDao.findDebitAmount(MSISDN, "SC-20261009-000007")).thenReturn(OptionalInt.of(4500));
+        when(ledgerDao.refundReferenceExists("SC-20261009-000007")).thenReturn(true);
+
+        BusinessException error = assertThrows(
+                BusinessException.class, () -> service.refund(MSISDN, "SC-20261009-000007"));
+
+        assertEquals(ErrorCode.TXN003, error.getErrorCode());
+        verify(subscriberDao, never()).creditBalance(MSISDN, 4500);
+        verify(ledgerDao, never()).insertRefund(MSISDN, 4500, 11250, "SC-20261009-000007", "REFUND");
+    }
+
+    @Test
+    void unknownReferenceIsCheckedBeforeTheAlreadyRefundedRule() throws Exception {
+        when(subscriberDao.lockBalance(MSISDN)).thenReturn(Optional.of(new BalanceSnapshot("A", 3250)));
+        when(ledgerDao.findDebitAmount(MSISDN, REF_NO)).thenReturn(OptionalInt.empty());
+        when(ledgerDao.refundReferenceExists(REF_NO)).thenReturn(true);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.refund(MSISDN, REF_NO));
+
+        assertEquals(ErrorCode.TXN404, error.getErrorCode());
+    }
+
+    @Test
+    void simultaneousRefundLosingTheUniqueIndexRaceIsTxn003() throws Exception {
+        when(subscriberDao.lockBalance(MSISDN)).thenReturn(Optional.of(new BalanceSnapshot("A", 3250)));
+        when(ledgerDao.findDebitAmount(MSISDN, REF_NO)).thenReturn(OptionalInt.of(3500));
+        when(ledgerDao.refundReferenceExists(REF_NO)).thenReturn(false);
+        when(subscriberDao.creditBalance(MSISDN, 3500)).thenReturn(6750);
+        when(ledgerDao.insertRefund(MSISDN, 3500, 6750, REF_NO, "REFUND")).thenReturn(OptionalLong.empty());
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.refund(MSISDN, REF_NO));
+
+        assertEquals(ErrorCode.TXN003, error.getErrorCode());
     }
 
     private void setField(String name, Object value) throws ReflectiveOperationException {
