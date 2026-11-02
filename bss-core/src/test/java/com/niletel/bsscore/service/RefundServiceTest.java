@@ -1,6 +1,7 @@
 package com.niletel.bsscore.service;
 
 import com.niletel.bsscore.common.BusinessException;
+import com.niletel.bsscore.common.DataAccessException;
 import com.niletel.bsscore.common.ErrorCode;
 import com.niletel.bsscore.dao.LedgerDao;
 import com.niletel.bsscore.dao.SubscriberDao;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
+import java.sql.SQLException;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
@@ -129,6 +131,51 @@ class RefundServiceTest {
         BusinessException error = assertThrows(BusinessException.class, () -> service.refund(MSISDN, REF_NO));
 
         assertEquals(ErrorCode.TXN003, error.getErrorCode());
+    }
+
+    @Test
+    void suspendedLineCanStillBeRefunded() throws Exception {
+        when(subscriberDao.lockBalance("01234567890")).thenReturn(Optional.of(new BalanceSnapshot("S", 2500)));
+        when(ledgerDao.findDebitAmount("01234567890", REF_NO)).thenReturn(OptionalInt.of(500));
+        when(subscriberDao.creditBalance("01234567890", 500)).thenReturn(3000);
+        when(ledgerDao.insertRefund("01234567890", 500, 3000, REF_NO, "REFUND"))
+                .thenReturn(OptionalLong.of(50233L));
+
+        assertEquals(new RefundResult(50233L, 500, 3000), service.refund("01234567890", REF_NO));
+    }
+
+    @Test
+    void missingSubscriberRowIsAnInternalErrorNotAnInventedRefund() throws Exception {
+        when(subscriberDao.lockBalance(MSISDN)).thenReturn(Optional.empty());
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.refund(MSISDN, REF_NO));
+
+        assertEquals(ErrorCode.SYS999, error.getErrorCode());
+        verify(ledgerDao, never()).findDebitAmount(MSISDN, REF_NO);
+    }
+
+    @Test
+    void ledgerInsertFailureAfterTheCreditPropagatesSoTheContainerRollsBack() throws Exception {
+        when(subscriberDao.lockBalance(MSISDN)).thenReturn(Optional.of(new BalanceSnapshot("A", 3250)));
+        when(ledgerDao.findDebitAmount(MSISDN, REF_NO)).thenReturn(OptionalInt.of(3500));
+        when(subscriberDao.creditBalance(MSISDN, 3500)).thenReturn(6750);
+        when(ledgerDao.insertRefund(MSISDN, 3500, 6750, REF_NO, "REFUND"))
+                .thenThrow(new SQLException("Forced ledger insert failure"));
+
+        assertThrows(DataAccessException.class, () -> service.refund(MSISDN, REF_NO));
+
+        InOrder order = inOrder(subscriberDao, ledgerDao);
+        order.verify(subscriberDao).creditBalance(MSISDN, 3500);
+        order.verify(ledgerDao).insertRefund(MSISDN, 3500, 6750, REF_NO, "REFUND");
+    }
+
+    @Test
+    void databaseFailureWhileLockingIsWrappedAsDataAccessException() throws Exception {
+        when(subscriberDao.lockBalance(MSISDN)).thenThrow(new SQLException("connection lost"));
+
+        assertThrows(DataAccessException.class, () -> service.refund(MSISDN, REF_NO));
+
+        verify(ledgerDao, never()).insertRefund(MSISDN, 3500, 6750, REF_NO, "REFUND");
     }
 
     private void setField(String name, Object value) throws ReflectiveOperationException {
