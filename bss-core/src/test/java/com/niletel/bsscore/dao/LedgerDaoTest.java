@@ -15,6 +15,7 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -165,6 +166,32 @@ class LedgerDaoTest {
         when(resultSet.next()).thenReturn(false);
 
         assertEquals(OptionalInt.empty(), dao.findDebitAmount("01123456789", "SC-20261012-000015"));
+
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void refundReferenceExistsOnlyLooksAtRefundRows() throws Exception {
+        when(resultSet.next()).thenReturn(true);
+
+        assertTrue(dao.refundReferenceExists("SC-20261009-000007"));
+
+        verify(connection).prepareStatement(org.mockito.ArgumentMatchers.contains(
+                "WHERE txn_type = 'F' AND ref_no = ?"
+        ));
+        verify(statement).setString(1, "SC-20261009-000007");
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
+
+    @Test
+    void refundReferenceExistsIsFalseWhenDebitWasNeverRefunded() throws Exception {
+        when(resultSet.next()).thenReturn(false);
+
+        assertFalse(dao.refundReferenceExists("SC-20261012-000015"));
 
         verify(resultSet).close();
         verify(statement).close();
