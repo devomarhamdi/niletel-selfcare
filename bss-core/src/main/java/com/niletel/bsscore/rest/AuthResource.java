@@ -1,5 +1,6 @@
 package com.niletel.bsscore.rest;
 
+import com.niletel.bsscore.model.OperatorRecord;
 import com.niletel.bsscore.common.ApiResponse;
 import com.niletel.bsscore.common.JsonKeys;
 import com.niletel.bsscore.common.SessionSupport;
@@ -39,5 +40,36 @@ public class AuthResource {
                 .add(JsonKeys.FULL_NAME, subscriber.fullName())
                 .add(JsonKeys.ROLE_CODE, AccessRules.SUB)
                 .build());
+    }
+
+    @POST
+    @Path("/operator-login")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    public Response operatorLogin(
+            @FormParam("username") String username,
+            @FormParam("password") String password,
+            @Context HttpServletRequest request) {
+
+        OperatorRecord operator = authService.loginOperator(username, password);
+
+        SessionSupport.startSession(request, operator.username(), operator.roleCode());
+
+        return ApiResponse.ok(Json.createObjectBuilder()
+                .add(JsonKeys.USERNAME, operator.username())
+                .add(JsonKeys.FULL_NAME, operator.fullName())
+                .add(JsonKeys.ROLE_CODE, operator.roleCode())
+                .build());
+    }
+
+    @POST
+    @Path("/logout")
+    public Response logout(@Context HttpServletRequest request) {
+        jakarta.servlet.http.HttpSession session = request.getSession(false);
+
+        if (session != null) {
+            session.invalidate();
+        }
+
+        return ApiResponse.ok();
     }
 }
