@@ -20,6 +20,7 @@ public final class JsonKeys {
 
     public static final String RESULT_OK = "OK";
     public static final String RESULT_FAIL = "FAIL";
+    public static final String USERNAME = "USERNAME";
 
     private JsonKeys() {
     }

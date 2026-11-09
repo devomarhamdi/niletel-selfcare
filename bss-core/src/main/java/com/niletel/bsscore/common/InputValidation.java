@@ -16,6 +16,9 @@ public final class InputValidation {
     private static final int MAX_DEBIT_AMOUNT = 10_000_000;
     private static final int MAX_DEBIT_AMOUNT_DIGITS = 8;
 
+    private static final Pattern USERNAME_PATTERN = Pattern.compile("^.{3,30}$");
+    private static final Pattern PASSWORD_PATTERN = Pattern.compile("^.{1,72}$");
+
     private InputValidation() {
     }
 
@@ -54,5 +57,12 @@ public final class InputValidation {
         }
         int amount = Integer.parseInt(significantDigits);
         return isDebitAmount(amount) ? OptionalInt.of(amount) : OptionalInt.empty();
+    }
+    public static boolean isUsername(String value) {
+        return value != null && USERNAME_PATTERN.matcher(value).matches();
+    }
+
+    public static boolean isPassword(String value) {
+        return value != null && PASSWORD_PATTERN.matcher(value).matches();
     }
 }
